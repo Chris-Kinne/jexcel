@@ -1913,7 +1913,7 @@ var methods = {
      * @param object cell
      * @return string value
      */
-    getValue : function(cell) {
+    getValue : function(cell, dropdown_transform_enable) {
         var value = null;
 
         // If is a string get the cell object
@@ -1942,6 +1942,9 @@ var methods = {
                 if (options.columns[position[0]].type == 'checkbox') {
                     // Get checkbox value
                     value = $(cell).find('input').val() == 'true' ? '1' : '0';
+                } else if (dropdown_transform_enable && options.columns[position[0]].type == 'dropdown' && options.columns[position[0]].dropdown_transform_ids) {
+                    // Get dropdown transform value
+                   value = $(cell).find('input').attr('data-dti');
                 } else if (options.columns[position[0]].type == 'dropdown' || options.columns[position[0]].type == 'autocomplete' || options.columns[position[0]].type == 'calendar') {
                     // Get value
                     value = $(cell).find('input').val();
@@ -2056,12 +2059,12 @@ var methods = {
 
         // Global options
         var options = $.fn.jexcel.defaults[id];
-
+        
         // Update cells
         $.each(cells, function (k, v) {
             // Get cell
             v.cell = $(main).find('#' + v.col + '-' + v.row); // TODO: check if v.cell is necessary
-
+            
             // Before Change
             if ($.fn.jexcel.ignoreEvents != true) {
                 if (typeof(options.onbeforechange) == 'function') {
@@ -2132,28 +2135,45 @@ var methods = {
                     val = '';
                     if (value) {
                         var combo = [];
+                        var rcombo = {};
                         var source = options.columns[position[0]].source;
-
+                        var dropdown_transform_ids = options.columns[position[0]].dropdown_transform_ids;
+                        
                         for (num = 0; num < source.length; num++) {
                             if (typeof(source[num]) == 'object') {
                                 combo[source[num].id] = source[num].name;
+                                if (dropdown_transform_ids == 1) {
+                                    rcombo[source[num].name] = source[num].id;
+                                } else if (dropdown_transform_ids == 2) {
+                                    rcombo[source[num].name + ' (' + source[num].id + ')'] = source[num].id;
+                                }
                             } else {
                                 combo[source[num]] = source[num];
                             }
                         }
-
+                        
                         if (combo[value]) {
                             key = value;
                             val = combo[value];
+                        } else if(dropdown_transform_ids && rcombo[value]) {
+                            key = rcombo[value];
+                            val = combo[key];
                         } else {
                             val = null;
                         }
                     }
-
+                    
                     if (! val) {
                         val = '&nbsp';
+                    } else {
+                        var attr_dti = '';
+                        if (dropdown_transform_ids == 1) {
+                            attr_dti = ' data-dti="' + val + '"';
+                        } else if (dropdown_transform_ids == 2) {
+                            attr_dti = ' data-dti="' + val + ' (' + key + ')"';
+                        }
+                        $(v.cell).html('<input type="hidden" value="' + key + '"' + attr_dti + '>' + val + '<span class="jexcel_arrow"><span id="jexcel_arrow"></span></span>');
                     }
-                    $(v.cell).html('<input type="hidden" value="' +  key + '">' + val + '<span class="jexcel_arrow"><span id="jexcel_arrow"></span></span>');
                 } else if (options.columns[position[0]].type == 'calendar') {
                     val = '';
                     if (value != 'undefined') {
@@ -2669,7 +2689,7 @@ var methods = {
                         row += delimiter;
                     }
                     // Get value
-                    val = $(this).jexcel('getValue', $(cell));
+                    val = $(this).jexcel('getValue', $(cell), true);
                     if (val.match && (val.match(/,/g) || val.match(/\n/) || val.match(/\"/))) {
                         // Scape double quotes
                         val = val.replace(new RegExp('"', 'g'), '""');
@@ -2769,10 +2789,10 @@ var methods = {
                     $(this).jexcel('insertColumn', x + row.length - $.fn.jexcel.defaults[id].data[y].length);
                 }
             }
-
+            
             // Records
             var records = []; 
-
+            
             // Go through the columns to get the data
             for (j = 0; j < data.length; j++) {
                 // Explode column values
@@ -2780,7 +2800,6 @@ var methods = {
                 for (i = 0; i < row.length; i++) {
                     // Get cell
                     cell = $(this).find('#' + (parseInt(i) + parseInt(x))  + '-' + (parseInt(j) + parseInt(y)));
-
                     // If cell exists
                     if ($(cell).length > 0) {
                         // Keep cells history
@@ -2794,7 +2813,7 @@ var methods = {
                     }
                 }
             }
-
+            
             // Select the new cells
             $(this).jexcel('updateSelection', records[0].cell, records[records.length-1].cell);
 
